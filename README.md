@@ -111,7 +111,6 @@ Core goals:
 
 - scikit-learn, pandas, matplotlib, seaborn, pandasql
 - Inspiration from open-source ML evaluation projects
-- [Your Name] and contributors
 
 ---
 

@@ -7,8 +7,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 st.title("Credit Card Approval Prediction")
 
-# Load dataset from GitHub raw link
-url = "https://raw.githubusercontent.com/Madhu4597/Creditcard-approval-prediction-project/main/Application_Data(credit card).csv"
+url = "https://raw.githubusercontent.com/Madhu4597/Creditcard-prediction-project/main/Application_Data%28credit%20card%29.csv"
 credit_card = pd.read_csv(url)
 
 st.write("Dataset columns:", credit_card.columns.tolist())
@@ -84,3 +83,4 @@ prediction = model.predict(input_scaled)
 result = 'Approved' if prediction[0] == 1 else 'Not Approved'
 st.subheader("Prediction")
 st.write(f"The customer is predicted as: **{result}**")
+

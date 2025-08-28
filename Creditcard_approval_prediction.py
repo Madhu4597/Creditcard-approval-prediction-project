@@ -84,8 +84,12 @@ def user_input_features():
 
 input_df = user_input_features()
 
-st.write("Features used for prediction:", features)
-st.write("User input dataframe:", input_df)
+# Display the user input dataframe with original categorical string values
+display_df = input_df.copy()
+for col in label_encoders:
+    display_df[col] = label_encoders[col].inverse_transform(display_df[col])
+
+st.write("User input dataframe:", display_df)
 
 # Scale and predict
 input_scaled = scaler.transform(input_df)

@@ -1,133 +1,88 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
-import pandasql as psql
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
-import math
 
-warnings.filterwarnings("ignore")
-pd.set_option("display.max_columns", None)
-
+warnings.filterwarnings('ignore')
 st.title("Credit Card Approval Prediction")
 
-# Load dataset
+# Load your CSV
 credit_card = pd.read_csv("Application_Data(credit card).csv")
-credit_card_bk = credit_card.copy()
+st.write("Columns for reference:", credit_card.columns.tolist())
 
-# Display initial dataset sample
-st.header("Initial Dataset Sample")
-st.dataframe(credit_card.head())
+# Preprocessing: Gender numeric
+credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].replace({'F': 0, 'M': 1}).astype(int)
 
-# Data info and checks
-st.header("Null Values in Dataset")
-st.write(credit_card.isnull().sum())
-
-st.header("Duplicate Entries in Dataset")
-st.write(credit_card.duplicated().any())
-
-st.header("Unique Values per Feature")
-st.write(credit_card.nunique())
-
-# Status distribution
-st.header("Status Class Distribution")
-Status_count = credit_card.Status.value_counts()
-st.write(Status_count)
-st.write(f"Class 0: {Status_count[0]}")
-st.write(f"Class 1: {Status_count[1]}")
-st.write(f"Proportion (1 to 0): {round(Status_count[1]/Status_count[0], 2)} : 1")
-st.write(f"Total samples: {len(credit_card)}")
-
-# Data preprocessing
-credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].str.replace('F', '0')
-credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].str.replace('M', '1')
-credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].astype(int)
-
-# Encoding categorical variables
-le = LabelEncoder()
-for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
+# Label encode categoricals and save encoder
+label_encoders = {}
+categorical_cols = ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']
+for col in categorical_cols:
+    le = LabelEncoder()
     credit_card[col] = le.fit_transform(credit_card[col])
+    label_encoders[col] = le
 
-st.header("Data Info After Encoding")
-st.write(credit_card.info())
+# List all features except 'Status'
+model_features = [
+    'Applicant_Gender', 'Income_Type', 'Education_Type', 'Family_Status',
+    'Housing_Type', 'Job_Title', 
+    'Age', 'Salary', 'Credit_Amount'
+] # <<<--- Replace with your real numeric columns
 
-st.header("Descriptive Statistics")
-st.write(credit_card.describe())
+X = credit_card[model_features]
+y = credit_card['Status']
 
-# Splitting features and target
-IndepVar = [col for col in credit_card.columns if col != 'Status']
-TargetVar = 'Status'
-x = credit_card[IndepVar]
-y = credit_card[TargetVar]
+# Oversample and train/test split
+ros = RandomOverSampler(sampling_strategy=0.125)
+X_res, y_res = ros.fit_resample(X, y)
+X_train, X_test, y_train, y_test = train_test_split(X_res, y_res, test_size=0.3, random_state=42)
 
-# Handle class imbalance with oversampling
-oversample = RandomOverSampler(sampling_strategy=0.125)
-x_over, y_over = oversample.fit_resample(x, y)
-st.write(f"Oversampled data size: {x_over.shape}, {y_over.shape}")
+# Scale
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# Split dataset
-x_train, x_test, y_train, y_test = train_test_split(x_over, y_over, test_size=0.3, random_state=42)
-st.write(f"Train/Test split shapes: {x_train.shape}, {x_test.shape}")
-
-# Feature scaling
-scaler = MinMaxScaler(feature_range=(0,1))
-x_train = scaler.fit_transform(x_train)
-x_test = scaler.transform(x_test)
-
-st.write(f"Class Distribution after Oversampling on train data:")
-class_counts = pd.Series(y_train).value_counts()
-st.write(class_counts)
-st.write(f"Proportion (1 to 0): {round(class_counts[1]/class_counts[0], 2)} : 1")
-
-# Train KNN model with default k=5
+# Train model
 model = KNeighborsClassifier(n_neighbors=5)
-model.fit(x_train, y_train)
+model.fit(X_train_scaled, y_train)
 
-# Dynamic input feature
-st.sidebar.header("Enter Customer Data")
+# Sidebar - user input for ALL columns
+st.sidebar.header('Enter New Customer Data')
 
 def user_input_features():
     gender = st.sidebar.selectbox('Applicant Gender', ['F', 'M'])
-    income_type = st.sidebar.number_input('Income Type (encoded integer)', min_value=int(credit_card['Income_Type'].min()), max_value=int(credit_card['Income_Type'].max()), value=int(credit_card['Income_Type'].mean()))
-    education_type = st.sidebar.number_input('Education Type (encoded integer)', min_value=int(credit_card['Education_Type'].min()), max_value=int(credit_card['Education_Type'].max()), value=int(credit_card['Education_Type'].mean()))
-    family_status = st.sidebar.number_input('Family Status (encoded integer)', min_value=int(credit_card['Family_Status'].min()), max_value=int(credit_card['Family_Status'].max()), value=int(credit_card['Family_Status'].mean()))
-    housing_type = st.sidebar.number_input('Housing Type (encoded integer)', min_value=int(credit_card['Housing_Type'].min()), max_value=int(credit_card['Housing_Type'].max()), value=int(credit_card['Housing_Type'].mean()))
-    job_title = st.sidebar.number_input('Job Title (encoded integer)', min_value=int(credit_card['Job_Title'].min()), max_value=int(credit_card['Job_Title'].max()), value=int(credit_card['Job_Title'].mean()))
+    income_type = st.sidebar.selectbox('Income Type', list(label_encoders['Income_Type'].classes_))
+    education_type = st.sidebar.selectbox('Education Type', list(label_encoders['Education_Type'].classes_))
+    family_status = st.sidebar.selectbox('Family Status', list(label_encoders['Family_Status'].classes_))
+    housing_type = st.sidebar.selectbox('Housing Type', list(label_encoders['Housing_Type'].classes_))
+    job_title = st.sidebar.selectbox('Job Title', list(label_encoders['Job_Title'].classes_))
     
-    # Please replace below numeric inputs with your actual numeric feature names and ranges
-    feature1 = st.sidebar.number_input('Feature1', float(credit_card['Feature1'].min()), float(credit_card['Feature1'].max()), float(credit_card['Feature1'].mean()))
-    feature2 = st.sidebar.number_input('Feature2', float(credit_card['Feature2'].min()), float(credit_card['Feature2'].max()), float(credit_card['Feature2'].mean()))
-    
+    age = st.sidebar.number_input('Age', int(credit_card['Age'].min()), int(credit_card['Age'].max()), int(credit_card['Age'].mean()))
+    salary = st.sidebar.number_input('Salary', float(credit_card['Salary'].min()), float(credit_card['Salary'].max()), float(credit_card['Salary'].mean()))
+    credit_amount = st.sidebar.number_input('Credit Amount', float(credit_card['Credit_Amount'].min()), float(credit_card['Credit_Amount'].max()), float(credit_card['Credit_Amount'].mean()))
+
+    # Add any extra numeric features in same pattern
+
     data = {
         'Applicant_Gender': 0 if gender == 'F' else 1,
-        'Income_Type': income_type,
-        'Education_Type': education_type,
-        'Family_Status': family_status,
-        'Housing_Type': housing_type,
-        'Job_Title': job_title,
-        'Feature1': feature1,
-        'Feature2': feature2,
-        # Add other features here...
+        'Income_Type': label_encoders['Income_Type'].transform([income_type])[0],
+        'Education_Type': label_encoders['Education_Type'].transform([education_type])[0],
+        'Family_Status': label_encoders['Family_Status'].transform([family_status])[0],
+        'Housing_Type': label_encoders['Housing_Type'].transform([housing_type])[0],
+        'Job_Title': label_encoders['Job_Title'].transform([job_title])[0],
+        'Age': age,
+        'Salary': salary,
+        'Credit_Amount': credit_amount
+        # Add more features if present
     }
-    features = pd.DataFrame(data, index=[0])
-    return features
+    return pd.DataFrame(data, index=[0])
 
 input_df = user_input_features()
-
-# Scale user input
 input_scaled = scaler.transform(input_df)
-
-# Prediction
 prediction = model.predict(input_scaled)
-approval = 'Approved' if prediction[0] == 1 else 'Not Approved'
+result = 'Approved' if prediction[0] == 1 else 'Not Approved'
 
-st.subheader('Prediction for Entered Customer')
-st.write(f"The customer is predicted as: **{approval}**")
-
-# Your existing KNN evaluation code goes here if needed
+st.subheader('Prediction Result')
+st.write(f"The customer is predicted to be: **{result}**")

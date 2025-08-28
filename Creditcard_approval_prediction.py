@@ -2,7 +2,6 @@
 # # Credit Card Approval Prediction (Cleaned Version)
 
 # %%
-pip install -U pandasql
 
 # %%
 #importing the libraries

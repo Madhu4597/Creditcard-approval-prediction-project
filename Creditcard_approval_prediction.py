@@ -19,7 +19,7 @@ import pandasql as psql
 
 # %%
 #loading the dataset
-credit_card=pd.read_csv(r"C:\22B91A5740\Projects\Application_Data(credit card).csv",header=0)
+credit_card=pd.read_csv(r"C:\Users\MADHUBABU\OneDrive\Documents\Application_Data(credit card).csv",header=0)
 #creating the backup file for the dataset
 credit_card_bk=credit_card.copy()
 credit_card.head()
@@ -955,6 +955,7 @@ ResultsFinal['%Error'] = round(((ResultsFinal['Status_A']-ResultsFinal['Status_P
 ResultsFinal.sample(10)
 
 # %%
+
 
 
 

@@ -1,103 +1,97 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
+import pandasql as psql
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
+import math
 
 warnings.filterwarnings('ignore')
-st.title("Credit Card Approval Prediction")
+st.title("Credit Card Approval Predictor")
 
+# Load training data and train model on app startup
 @st.cache_data
-def load_data():
-    df = pd.read_csv("Application_Data(credit card).csv")
+def load_and_train():
+    # Load dataset
+    df = pd.read_csv("Application_Data (credit card).csv")
+    df_backup = df.copy()
+
+    # Preprocessing
     df['Applicant_Gender'] = df['Applicant_Gender'].replace({'F': 0, 'M': 1}).astype(int)
     le = LabelEncoder()
     for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
         df[col] = le.fit_transform(df[col])
-    return df
 
-data = load_data()
-feature_cols = data.columns.drop('Status')
-X = data[feature_cols]
-y = data['Status']
+    # Features and target
+    X = df.drop("Status", axis=1)
+    y = df['Status']
 
-# Balance data and train KNN model
-oversample = RandomOverSampler(sampling_strategy=0.125)
-X_over, y_over = oversample.fit_resample(X, y)
-X_train, X_test, y_train, y_test = train_test_split(X_over, y_over, test_size=0.3, random_state=42)
+    # Oversample minority class
+    oversample = RandomOverSampler(sampling_strategy=0.125)
+    X_over, y_over = oversample.fit_resample(X, y)
 
-scaler = MinMaxScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X_over, y_over, test_size=0.3, random_state=42)
 
-model = KNeighborsClassifier(n_neighbors=5)
-model.fit(X_train_scaled, y_train)
+    # Scale features
+    scaler = MinMaxScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
-st.sidebar.header("Choose Input Mode")
+    # Train KNN model - using K=5 as example
+    model = KNeighborsClassifier(n_neighbors=5)
+    model.fit(X_train_scaled, y_train)
 
-input_mode = st.sidebar.radio("Select input mode:", ['Single Customer Input', 'Upload CSV File'])
+    return model, scaler, df_backup.columns.drop("Status")
 
-def preprocess_input(df):
-    # Same preprocessing as training
-    df['Applicant_Gender'] = df['Applicant_Gender'].replace({'F': 0, 'M': 1}).astype(int)
-    le = LabelEncoder()
-    for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
-        df[col] = le.fit_transform(df[col])
-    return df
+model, scaler, feature_cols = load_and_train()
 
-if input_mode == 'Single Customer Input':
-    st.sidebar.subheader("Enter Customer Details")
-    gender = st.sidebar.selectbox("Applicant Gender", ['F', 'M'])
-    income_type = st.sidebar.selectbox("Income Type", sorted(data['Income_Type'].unique()))
-    education_type = st.sidebar.selectbox("Education Type", sorted(data['Education_Type'].unique()))
-    family_status = st.sidebar.selectbox("Family Status", sorted(data['Family_Status'].unique()))
-    housing_type = st.sidebar.selectbox("Housing Type", sorted(data['Housing_Type'].unique()))
-    job_title = st.sidebar.selectbox("Job Title", sorted(data['Job_Title'].unique()))
-    # Provide numeric inputs for each numeric feature - replace 'FeatureX' with actual names and ranges
-    feature1 = st.sidebar.number_input("Feature1", float(data['Feature1'].min()), float(data['Feature1'].max()), float(data['Feature1'].mean()))
-    feature2 = st.sidebar.number_input("Feature2", float(data['Feature2'].min()), float(data['Feature2'].max()), float(data['Feature2'].mean()))
-    
-    input_dict = {
-        'Applicant_Gender': gender,
-        'Income_Type': income_type,
-        'Education_Type': education_type,
-        'Family_Status': family_status,
-        'Housing_Type': housing_type,
-        'Job_Title': job_title,
-        'Feature1': feature1,
-        'Feature2': feature2
-        # Add all other features here as necessary
-    }
-    input_df = pd.DataFrame([input_dict])
-    input_df = preprocess_input(input_df)
-    input_scaled = scaler.transform(input_df)
-    prediction = model.predict(input_scaled)
-    pred_label = 'Approved' if prediction[0] == 1 else 'Not Approved'
-    st.subheader("Prediction Result")
-    st.write(f"The customer is predicted as: **{pred_label}**")
+# File uploader for customer data
+st.sidebar.header("Upload New Customer Data")
+uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
+
+if uploaded_file is not None:
+    new_data = pd.read_csv(uploaded_file)
+
+    st.subheader("Uploaded Customer Data")
+    st.write(new_data.head())
+
+    # Validate required columns
+    missing_cols = set(feature_cols) - set(new_data.columns)
+    if missing_cols:
+        st.error(f"Missing columns in uploaded data: {missing_cols}")
+    else:
+        # Preprocessing: convert categorical variables similarly
+        if 'Applicant_Gender' in new_data.columns:
+            new_data['Applicant_Gender'] = new_data['Applicant_Gender'].replace({'F': 0, 'M': 1}).astype(int)
+        for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
+            if col in new_data.columns:
+                new_data[col] = LabelEncoder().fit_transform(new_data[col])
+
+        # Select and reorder features
+        X_new = new_data[list(feature_cols)]
+
+        # Scale features
+        X_new_scaled = scaler.transform(X_new)
+
+        # Predict approval status
+        predictions = model.predict(X_new_scaled)
+        new_data['Approval_Prediction'] = predictions
+        new_data['Approval_Prediction_Label'] = new_data['Approval_Prediction'].map({0: 'Not Approved', 1: 'Approved'})
+
+        st.subheader("Prediction Results")
+        st.write(new_data[['Approval_Prediction_Label']])
+
+        # Optionally download the results
+        csv = new_data.to_csv(index=False).encode()
+        st.download_button("Download Predictions as CSV", data=csv, file_name="predictions.csv")
 
 else:
-    st.sidebar.subheader("Upload Customer CSV file")
-    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-    if uploaded_file is not None:
-        new_customers = pd.read_csv(uploaded_file)
-        st.write("Uploaded data", new_customers.head())
-        
-        # Validate columns
-        missing = set(feature_cols) - set(new_customers.columns)
-        if missing:
-            st.error(f"Missing columns in uploaded file: {missing}")
-        else:
-            new_customers_processed = preprocess_input(new_customers)
-            new_customers_scaled = scaler.transform(new_customers_processed)
-            preds = model.predict(new_customers_scaled)
-            new_customers['Approval_Prediction'] = preds
-            new_customers['Status_Label'] = new_customers['Approval_Prediction'].map({0: 'Not Approved', 1: 'Approved'})
-            st.subheader("Prediction Results")
-            st.write(new_customers)
-            csv = new_customers.to_csv(index=False).encode()
-            st.download_button("Download predictions as CSV", data=csv, file_name="predictions.csv")
+    st.write("Upload customer data CSV on the left sidebar to get approval predictions.")
 

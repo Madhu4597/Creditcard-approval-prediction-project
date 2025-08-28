@@ -25,7 +25,7 @@ pd.set_option("display.max_columns", None)
 
 # %%
 # loading the dataset (adjust path according to where your file is in repo)
-credit_card = pd.read_csv("data/Application_Data(credit card).csv")
+credit_card = pd.read_csv("Application_Data(credit card).csv")
 
 # creating the backup file for the dataset
 credit_card_bk = credit_card.copy()
@@ -126,8 +126,8 @@ print("Proportion: ", round(Status_count[1]/Status_count[0],2), ':1')
 
 # %%
 # Read previous results files (adjust paths if needed)
-KNN_Results = pd.read_csv("data/KNN_Results.csv")
-EMResults1 = pd.read_csv("data/EMResults.csv")
+KNN_Results = pd.read_csv("KNN_Results.csv")
+EMResults1 = pd.read_csv("EMResults.csv")
 
 # %%
 # KNN algorithm implementation with evaluation
@@ -205,3 +205,4 @@ for k in range(1, 21):
 
 # %%
 print(KNN_Results.head(20))
+

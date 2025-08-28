@@ -27,7 +27,7 @@ if 'Applicant_Gender' in features:
 categorical_cols = []
 numeric_cols = []
 for col in features:
-    # Heuristic: categorical features often have object type or <20 unique values
+    # Categorical if object or few unique values
     if credit_card[col].dtype == "object" or credit_card[col].nunique() < 20:
         categorical_cols.append(col)
     else:
@@ -59,7 +59,6 @@ st.sidebar.header("Enter Customer Data")
 
 def user_input_features():
     data = {}
-    # For all columns in MODEL FEATURES ONLY, not extra
     for col in features:
         if col == 'Applicant_Gender':
             gender = st.sidebar.selectbox('Applicant Gender', ['F', 'M'])
@@ -67,7 +66,6 @@ def user_input_features():
         elif col in categorical_cols:
             options = label_encoders[col].classes_
             selected = st.sidebar.selectbox(col.replace('_', ' '), options)
-            # Encode it safely
             data[col] = int(label_encoders[col].transform([selected])[0])
         elif col in numeric_cols:
             val = st.sidebar.number_input(
@@ -79,12 +77,11 @@ def user_input_features():
                 format="%d"
             )
             data[col] = val
-    # Return dataframe with EXACT same col order as used for scaler/model
     return pd.DataFrame([data])[features]
 
 input_df = user_input_features()
 
-# Display the user input dataframe with original categorical string values
+# Convert categorical encoded values back to original strings for display
 display_df = input_df.copy()
 for col in label_encoders:
     display_df[col] = label_encoders[col].inverse_transform(display_df[col])

@@ -1,167 +1,103 @@
-# %% [markdown]
-# Credit Card Approval Prediction (Streamlit App)
-
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
-import pandasql as psql
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
-import math
 
-warnings.filterwarnings("ignore")
-pd.set_option("display.max_columns", None)
-
+warnings.filterwarnings('ignore')
 st.title("Credit Card Approval Prediction")
 
-# Load Data
-credit_card = pd.read_csv("Application_Data(credit card).csv")
-credit_card_bk = credit_card.copy()
+@st.cache_data
+def load_data():
+    df = pd.read_csv("Application_Data(credit card).csv")
+    df['Applicant_Gender'] = df['Applicant_Gender'].replace({'F': 0, 'M': 1}).astype(int)
+    le = LabelEncoder()
+    for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
+        df[col] = le.fit_transform(df[col])
+    return df
 
-st.header("Initial Dataset Sample")
-st.dataframe(credit_card.head())
+data = load_data()
+feature_cols = data.columns.drop('Status')
+X = data[feature_cols]
+y = data['Status']
 
-# Data info and checks
-st.header("Null Values in Dataset")
-st.write(credit_card.isnull().sum())
-
-st.header("Duplicate Entries in Dataset")
-st.write(credit_card.duplicated().any())
-
-st.header("Unique Values per Feature")
-st.write(credit_card.nunique())
-
-# Status distribution
-st.header("Status Class Distribution")
-Status_count = credit_card.Status.value_counts()
-st.write(Status_count)
-st.write(f"Class 0: {Status_count[0]}")
-st.write(f"Class 1: {Status_count[1]}")
-st.write(f"Proportion (1 to 0): {round(Status_count[1]/Status_count[0], 2)} : 1")
-st.write(f"Total samples: {len(credit_card)}")
-
-# Data preprocessing
-credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].str.replace('F', '0')
-credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].str.replace('M', '1')
-credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].astype(int)
-
-# Encoding categorical variables
-le = LabelEncoder()
-for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
-    credit_card[col] = le.fit_transform(credit_card[col])
-
-st.header("Data Info After Encoding")
-st.write(credit_card.info())
-
-st.header("Descriptive Statistics")
-st.write(credit_card.describe())
-
-# Splitting features and target
-IndepVar = [col for col in credit_card.columns if col != 'Status']
-TargetVar = 'Status'
-x = credit_card[IndepVar]
-y = credit_card[TargetVar]
-
-# Handle class imbalance with oversampling
+# Balance data and train KNN model
 oversample = RandomOverSampler(sampling_strategy=0.125)
-x_over, y_over = oversample.fit_resample(x, y)
+X_over, y_over = oversample.fit_resample(X, y)
+X_train, X_test, y_train, y_test = train_test_split(X_over, y_over, test_size=0.3, random_state=42)
 
-st.write(f"Oversampled data size: {x_over.shape}, {y_over.shape}")
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# Split dataset
-x_train, x_test, y_train, y_test = train_test_split(x_over, y_over, test_size=0.3, random_state=42)
-st.write(f"Train/Test split shapes: {x_train.shape}, {x_test.shape}")
+model = KNeighborsClassifier(n_neighbors=5)
+model.fit(X_train_scaled, y_train)
 
-# Feature scaling
-scaler = MinMaxScaler(feature_range=(0,1))
-x_train = scaler.fit_transform(x_train)
-x_test = scaler.transform(x_test)
+st.sidebar.header("Choose Input Mode")
 
-st.write(f"Class Distribution after Oversampling on train data:")
-class_counts = pd.Series(y_train).value_counts()
-st.write(class_counts)
-st.write(f"Proportion (1 to 0): {round(class_counts[1]/class_counts[0], 2)} : 1")
+input_mode = st.sidebar.radio("Select input mode:", ['Single Customer Input', 'Upload CSV File'])
 
-# Read previous results (optional: display)
-KNN_Results = pd.read_csv("KNN_Results.csv")
-EMResults1 = pd.read_csv("EMResults.csv")
+def preprocess_input(df):
+    # Same preprocessing as training
+    df['Applicant_Gender'] = df['Applicant_Gender'].replace({'F': 0, 'M': 1}).astype(int)
+    le = LabelEncoder()
+    for col in ['Income_Type', 'Education_Type', 'Family_Status', 'Housing_Type', 'Job_Title']:
+        df[col] = le.fit_transform(df[col])
+    return df
 
-st.header("Previous KNN Results Sample")
-st.dataframe(KNN_Results.head())
-
-# KNN Model loop with evaluation & ROC curve plot
-st.header("KNN Algorithm Evaluation")
-
-for k in range(1, 21):
-    model_knn = KNeighborsClassifier(n_neighbors=k)
-    model_knn.fit(x_train, y_train)
+if input_mode == 'Single Customer Input':
+    st.sidebar.subheader("Enter Customer Details")
+    gender = st.sidebar.selectbox("Applicant Gender", ['F', 'M'])
+    income_type = st.sidebar.selectbox("Income Type", sorted(data['Income_Type'].unique()))
+    education_type = st.sidebar.selectbox("Education Type", sorted(data['Education_Type'].unique()))
+    family_status = st.sidebar.selectbox("Family Status", sorted(data['Family_Status'].unique()))
+    housing_type = st.sidebar.selectbox("Housing Type", sorted(data['Housing_Type'].unique()))
+    job_title = st.sidebar.selectbox("Job Title", sorted(data['Job_Title'].unique()))
+    # Provide numeric inputs for each numeric feature - replace 'FeatureX' with actual names and ranges
+    feature1 = st.sidebar.number_input("Feature1", float(data['Feature1'].min()), float(data['Feature1'].max()), float(data['Feature1'].mean()))
+    feature2 = st.sidebar.number_input("Feature2", float(data['Feature2'].min()), float(data['Feature2'].max()), float(data['Feature2'].mean()))
     
-    y_pred = model_knn.predict(x_test)
-    y_pred_prob = model_knn.predict_proba(x_test)
-    
-    st.subheader(f"KNN with k={k}")
-    actual = y_test
-    predicted = y_pred
-    matrix = confusion_matrix(actual, predicted, labels=[1,0])
-    st.write("Confusion Matrix:\n", matrix)
-    
-    tp, fn, fp, tn = matrix.reshape(-1)
-    
-    sensitivity = round(tp/(tp+fn), 3)
-    specificity = round(tn/(tn+fp), 3)
-    accuracy = round((tp+tn)/(tp+fp+tn+fn), 3)
-    balanced_accuracy = round((sensitivity+specificity)/2, 3)
-    precision = round(tp/(tp+fp), 3) if (tp+fp)>0 else 0
-    f1Score = round((2*tp/(2*tp + fp + fn)), 3)
-    
-    mx = (tp+fp)*(tp+fn)*(tn+fp)*(tn+fn)
-    MCC = round(((tp*tn) - (fp*fn)) / (math.sqrt(mx) if mx>0 else 1), 3)
-    
-    st.write(f"Accuracy: {accuracy*100:.2f} %")
-    st.write(f"Precision: {precision*100:.2f} %")
-    st.write(f"Recall (Sensitivity): {sensitivity*100:.2f} %")
-    st.write(f"F1 Score: {f1Score}")
-    st.write(f"Specificity: {specificity*100:.2f} %")
-    st.write(f"Balanced Accuracy: {balanced_accuracy*100:.2f} %")
-    st.write(f"MCC: {MCC}")
-    st.write(f"ROC AUC Score: {roc_auc_score(actual, predicted):.3f}")
-    
-    fpr, tpr, _ = roc_curve(actual, y_pred_prob[:,1])
-    plt.figure()
-    plt.plot(fpr, tpr, label=f'KNN (K={k}) (area = {roc_auc_score(actual, predicted):.2f})')
-    plt.plot([0,1], [0,1], 'r--')
-    plt.xlim([0,1])
-    plt.ylim([0,1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve for KNN')
-    plt.legend(loc='lower right')
-    st.pyplot(plt)
-    plt.clf()
-    
-    new_row = {
-        'Model Name': 'KNeighborsClassifier',
-        'KNN K Value': k,
-        'True_Positive': tp,
-        'False_Negative': fn,
-        'False_Positive': fp,
-        'True_Negative': tn,
-        'Accuracy': accuracy,
-        'Precision': precision,
-        'Recall': sensitivity,
-        'F1 Score': f1Score,
-        'Specificity': specificity,
-        'MCC': MCC,
-        'ROC_AUC_Score': roc_auc_score(actual, predicted),
-        'Balanced Accuracy': balanced_accuracy
+    input_dict = {
+        'Applicant_Gender': gender,
+        'Income_Type': income_type,
+        'Education_Type': education_type,
+        'Family_Status': family_status,
+        'Housing_Type': housing_type,
+        'Job_Title': job_title,
+        'Feature1': feature1,
+        'Feature2': feature2
+        # Add all other features here as necessary
     }
-    KNN_Results = pd.concat([KNN_Results, pd.DataFrame([new_row])], ignore_index=True)
+    input_df = pd.DataFrame([input_dict])
+    input_df = preprocess_input(input_df)
+    input_scaled = scaler.transform(input_df)
+    prediction = model.predict(input_scaled)
+    pred_label = 'Approved' if prediction[0] == 1 else 'Not Approved'
+    st.subheader("Prediction Result")
+    st.write(f"The customer is predicted as: **{pred_label}**")
 
-st.subheader("Updated KNN Results")
-st.dataframe(KNN_Results.head(20))
+else:
+    st.sidebar.subheader("Upload Customer CSV file")
+    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+    if uploaded_file is not None:
+        new_customers = pd.read_csv(uploaded_file)
+        st.write("Uploaded data", new_customers.head())
+        
+        # Validate columns
+        missing = set(feature_cols) - set(new_customers.columns)
+        if missing:
+            st.error(f"Missing columns in uploaded file: {missing}")
+        else:
+            new_customers_processed = preprocess_input(new_customers)
+            new_customers_scaled = scaler.transform(new_customers_processed)
+            preds = model.predict(new_customers_scaled)
+            new_customers['Approval_Prediction'] = preds
+            new_customers['Status_Label'] = new_customers['Approval_Prediction'].map({0: 'Not Approved', 1: 'Approved'})
+            st.subheader("Prediction Results")
+            st.write(new_customers)
+            csv = new_customers.to_csv(index=False).encode()
+            st.download_button("Download predictions as CSV", data=csv, file_name="predictions.csv")
+

@@ -73,7 +73,7 @@ def user_input_features():
         'Age': age,
         'Annual_Income': income
     }
-    return pd.DataFrame(data, index=)
+    return pd.DataFrame(data, index=[0])
 
 input_df = user_input_features()
 
@@ -86,3 +86,4 @@ result = 'Approved' if prediction == 1 else 'Not Approved'
 
 st.subheader('Prediction Result')
 st.write(f'The customer is predicted as: **{result}**')
+

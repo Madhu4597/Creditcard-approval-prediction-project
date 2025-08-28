@@ -47,13 +47,10 @@ y = credit_card['Status']
 # --- MODEL PIPELINE ---
 ros = RandomOverSampler(sampling_strategy=0.125)
 X_res, y_res = ros.fit_resample(X, y)
-
 X_train, X_test, y_train, y_test = train_test_split(X_res, y_res, test_size=0.3, random_state=42)
-
 scaler = MinMaxScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
-
 model = KNeighborsClassifier(n_neighbors=5)
 model.fit(X_train_scaled, y_train)
 
@@ -75,9 +72,11 @@ def user_input_features():
         elif col in numeric_cols:
             val = st.sidebar.number_input(
                 col.replace('_', ' '),
-                float(credit_card[col].min()),
-                float(credit_card[col].max()),
-                float(credit_card[col].mean())
+                min_value=int(credit_card[col].min()),
+                max_value=int(credit_card[col].max()),
+                value=int(credit_card[col].mean()),
+                step=1,
+                format="%d"
             )
             data[col] = val
     # Return dataframe with EXACT same col order as used for scaler/model

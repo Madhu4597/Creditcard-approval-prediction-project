@@ -7,44 +7,36 @@ from sklearn.neighbors import KNeighborsClassifier
 
 st.title("Credit Card Approval Prediction")
 
-# --- LOAD DATA ---
-credit_card = pd.read_csv("Application_Data(credit card).csv")
+# Load dataset from GitHub raw link
+url = "https://raw.githubusercontent.com/Madhu4597/Creditcard-approval-prediction-project/main/Application_Data(credit card).csv"
+credit_card = pd.read_csv(url)
 
-# List all columns for reference
 st.write("Dataset columns:", credit_card.columns.tolist())
 
-# Drop any columns not needed (like IDs) here:
-ignore_cols = ['Applicant ID', 'Status']  # Add all columns you do NOT want the model to use for prediction
+ignore_cols = ['Applicant_ID', 'Status']
 features = [col for col in credit_card.columns if col not in ignore_cols]
 
-# Preprocess Applicant_Gender robustly
-if 'Applicant_Gender' in features:
-    credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].replace({'F': 0, 'M': 1})
-    # Set any missing/bad genders to 0 (female) by default
-    credit_card['Applicant_Gender'] = pd.to_numeric(credit_card['Applicant_Gender'], errors='coerce').fillna(0).astype(int)
+# Preprocess Applicant Gender
+credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].replace({'F': 0, 'M': 1})
+credit_card['Applicant_Gender'] = pd.to_numeric(credit_card['Applicant_Gender'], errors='coerce').fillna(0).astype(int)
 
-# Find which columns are categorical and which are numeric
 categorical_cols = []
 numeric_cols = []
 for col in features:
-    # Heuristic: categorical features often have object type or <20 unique values
     if credit_card[col].dtype == "object" or credit_card[col].nunique() < 20:
         categorical_cols.append(col)
     else:
         numeric_cols.append(col)
 
-# Label encode categoricals and save encoder
 label_encoders = {}
 for col in categorical_cols:
     le = LabelEncoder()
     credit_card[col] = le.fit_transform(credit_card[col].astype(str))
     label_encoders[col] = le
 
-# X and y for modeling
 X = credit_card[features]
 y = credit_card['Status']
 
-# --- MODEL PIPELINE ---
 ros = RandomOverSampler(sampling_strategy=0.125)
 X_res, y_res = ros.fit_resample(X, y)
 
@@ -57,12 +49,10 @@ X_test_scaled = scaler.transform(X_test)
 model = KNeighborsClassifier(n_neighbors=5)
 model.fit(X_train_scaled, y_train)
 
-# --- SIDEBAR DYNAMIC FORM ---
 st.sidebar.header("Enter Customer Data")
 
 def user_input_features():
     data = {}
-    # For all columns in MODEL FEATURES ONLY, not extra
     for col in features:
         if col == 'Applicant_Gender':
             gender = st.sidebar.selectbox('Applicant Gender', ['F', 'M'])
@@ -70,17 +60,17 @@ def user_input_features():
         elif col in categorical_cols:
             options = label_encoders[col].classes_
             selected = st.sidebar.selectbox(col.replace('_', ' '), options)
-            # Encode it safely
             data[col] = int(label_encoders[col].transform([selected])[0])
         elif col in numeric_cols:
             val = st.sidebar.number_input(
                 col.replace('_', ' '),
-                float(credit_card[col].min()),
-                float(credit_card[col].max()),
-                float(credit_card[col].mean())
+                min_value=int(credit_card[col].min()),
+                max_value=int(credit_card[col].max()),
+                value=int(credit_card[col].mean()),
+                step=1,
+                format="%d"
             )
             data[col] = val
-    # Return dataframe with EXACT same col order as used for scaler/model
     return pd.DataFrame([data])[features]
 
 input_df = user_input_features()
@@ -88,10 +78,9 @@ input_df = user_input_features()
 st.write("Features used for prediction:", features)
 st.write("User input dataframe:", input_df)
 
-# Scale and predict
 input_scaled = scaler.transform(input_df)
 prediction = model.predict(input_scaled)
-result = 'Approved' if prediction[0] == 1 else 'Not Approved'
 
+result = 'Approved' if prediction[0] == 1 else 'Not Approved'
 st.subheader("Prediction")
 st.write(f"The customer is predicted as: **{result}**")

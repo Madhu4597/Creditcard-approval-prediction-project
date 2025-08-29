@@ -15,13 +15,11 @@ st.write("Dataset columns:", credit_card.columns.tolist())
 ignore_cols = ['Applicant ID', 'Status']
 features = [col for col in credit_card.columns if col not in ignore_cols]
 
-# Preprocess Applicant_Gender robustly
 if 'Applicant_Gender' in features:
     credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].str.strip()
     credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].replace({'F': 0, 'M': 1})
     credit_card['Applicant_Gender'] = pd.to_numeric(credit_card['Applicant_Gender'], errors='coerce').fillna(0).astype(int)
 
-# Find which columns are categorical and which are numeric
 categorical_cols = []
 numeric_cols = []
 for col in features:
@@ -70,22 +68,23 @@ def user_input_features():
             )
             data[col] = val
     return pd.DataFrame([data])[features]
+
 input_df = user_input_features()
 
-# --- remove unwanted columns from display ---
-columns_to_remove = ['Total_Bad_Debt', 'Total_Good_Debt']  # <-- Change this list to any columns you want removed
+# --- Display block: decode and remove columns containing 'data' (case-insensitive) ---
 display_df = input_df.copy()
 for col in categorical_cols:
     if col != 'Applicant_Gender' and col in display_df.columns:
         display_df[col] = display_df[col].astype(int)
         display_df[col] = label_encoders[col].inverse_transform(display_df[col])
+
 if 'Applicant_Gender' in display_df.columns:
     display_df['Applicant_Gender'] = display_df['Applicant_Gender'].map({0: 'F', 1: 'M'}).fillna('Unknown')
-for col in columns_to_remove:
-    if col in display_df.columns:
-        display_df = display_df.drop(columns=[col])
 
-# Display the dataframe
+# Remove any column containing 'data' or 'dataset' (ignore case)
+cols_to_drop = [col for col in display_df.columns if 'data' in col.lower() or 'dataset' in col.lower()]
+display_df = display_df.drop(columns=cols_to_drop, errors='ignore')
+
 st.write("User input dataframe:", display_df)
 
 input_scaled = scaler.transform(input_df)

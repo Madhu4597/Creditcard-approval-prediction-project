@@ -10,10 +10,8 @@ st.title("Credit Card Approval Prediction")
 # --- LOAD DATA ---
 credit_card = pd.read_csv("Application_Data(credit card).csv")
 
-# List all columns
 st.write("Dataset columns:", credit_card.columns.tolist())
 
-# Columns to ignore for predictions
 ignore_cols = ['Applicant ID', 'Status']
 features = [col for col in credit_card.columns if col not in ignore_cols]
 
@@ -23,7 +21,7 @@ if 'Applicant_Gender' in features:
     credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].replace({'F': 0, 'M': 1})
     credit_card['Applicant_Gender'] = pd.to_numeric(credit_card['Applicant_Gender'], errors='coerce').fillna(0).astype(int)
 
-# Identify categorical and numeric features
+# Find which columns are categorical and which are numeric
 categorical_cols = []
 numeric_cols = []
 for col in features:
@@ -32,33 +30,25 @@ for col in features:
     else:
         numeric_cols.append(col)
 
-# Label encode categorical columns
 label_encoders = {}
 for col in categorical_cols:
     le = LabelEncoder()
     credit_card[col] = le.fit_transform(credit_card[col].astype(str))
     label_encoders[col] = le
 
-# Prepare X and y
 X = credit_card[features]
 y = credit_card['Status']
 
-# Oversample minority class
 ros = RandomOverSampler(sampling_strategy=0.125)
 X_res, y_res = ros.fit_resample(X, y)
-
-# Split and scale data
 X_train, X_test, y_train, y_test = train_test_split(X_res, y_res, test_size=0.3, random_state=42)
 scaler = MinMaxScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
-
-# Train model
 model = KNeighborsClassifier(n_neighbors=5)
 model.fit(X_train_scaled, y_train)
 
 st.sidebar.header("Enter Customer Data")
-
 def user_input_features():
     data = {}
     for col in features:
@@ -80,24 +70,21 @@ def user_input_features():
             )
             data[col] = val
     return pd.DataFrame([data])[features]
-
 input_df = user_input_features()
 
-# Decode categorical columns back to original strings for display
+# --- CORRECT DISPLAY OF ORIGINAL CATEGORICAL LABELS (INCLUDING GENDER) ---
 display_df = input_df.copy()
 for col in categorical_cols:
-    if col in display_df.columns:
+    if col != 'Applicant_Gender' and col in display_df.columns:
         display_df[col] = display_df[col].astype(int)
         display_df[col] = label_encoders[col].inverse_transform(display_df[col])
 
-# Manually decode Applicant_Gender to 'F' and 'M'
 if 'Applicant_Gender' in display_df.columns:
-    display_df['Applicant_Gender'] = display_df['Applicant_Gender'].map({0: 'F', 1: 'M'})
+    # Map integer back to "F" and "M" directly
+    display_df['Applicant_Gender'] = display_df['Applicant_Gender'].map({0: 'F', 1: 'M'}).fillna('Unknown')
 
-# Display user input dataframe as in dataset
 st.write("User input dataframe:", display_df)
 
-# Prepare for prediction
 input_scaled = scaler.transform(input_df)
 prediction = model.predict(input_scaled)
 result = 'Approved' if prediction[0] == 1 else 'Not Approved'

@@ -72,17 +72,20 @@ def user_input_features():
     return pd.DataFrame([data])[features]
 input_df = user_input_features()
 
-# --- CORRECT DISPLAY OF ORIGINAL CATEGORICAL LABELS (INCLUDING GENDER) ---
+# --- remove unwanted columns from display ---
+columns_to_remove = ['Total_Bad_Debt', 'Total_Good_Debt']  # <-- Change this list to any columns you want removed
 display_df = input_df.copy()
 for col in categorical_cols:
     if col != 'Applicant_Gender' and col in display_df.columns:
         display_df[col] = display_df[col].astype(int)
         display_df[col] = label_encoders[col].inverse_transform(display_df[col])
-
 if 'Applicant_Gender' in display_df.columns:
-    # Map integer back to "F" and "M" directly
     display_df['Applicant_Gender'] = display_df['Applicant_Gender'].map({0: 'F', 1: 'M'}).fillna('Unknown')
+for col in columns_to_remove:
+    if col in display_df.columns:
+        display_df = display_df.drop(columns=[col])
 
+# Display the dataframe
 st.write("User input dataframe:", display_df)
 
 input_scaled = scaler.transform(input_df)

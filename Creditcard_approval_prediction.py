@@ -1,14 +1,18 @@
 import streamlit as st
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
 
 st.title("Credit Card Approval Prediction")
 
-# ---------------- Data source (drop-in section) ----------------
+# ---------------- Data source (kept) ----------------
 st.sidebar.header("Data source")
 src = st.sidebar.selectbox("Choose data source", ["Repository file", "Upload CSV"])  # sidebar selector
 DEFAULT_CSV = "Application_Data(credit card).csv"  # repo-relative default
 
-@st.cache_data  # cache CSV reads across reruns
+@st.cache_data
 def load_csv_repo(path: str):
     return pd.read_csv(path)
 
@@ -28,13 +32,7 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
-st.write("Dataset columns:", credit_card.columns.tolist())
-
-# ---------------- rest of your existing code (unchanged) ----------------
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from imblearn.over_sampling import RandomOverSampler
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
+# st.write("Dataset columns:", credit_card.columns.tolist())  # REMOVED
 
 ignore_cols = ['Applicant ID', 'Status']
 features = [col for col in credit_card.columns if col not in ignore_cols]
@@ -44,7 +42,8 @@ if 'Applicant_Gender' in features:
     credit_card['Applicant_Gender'] = credit_card['Applicant_Gender'].replace({'F': 0, 'M': 1})
     credit_card['Applicant_Gender'] = pd.to_numeric(credit_card['Applicant_Gender'], errors='coerce').fillna(0).astype(int)
 
-categorical_cols, numeric_cols = [], []
+categorical_cols = []
+numeric_cols = []
 for col in features:
     if credit_card[col].dtype == "object" or credit_card[col].nunique() < 20:
         categorical_cols.append(col)
@@ -97,6 +96,7 @@ def user_input_features():
 
 input_df = user_input_features()
 
+# --- Display block: decode and remove columns containing 'data' (case-insensitive) ---
 display_df = input_df.copy()
 for col in categorical_cols:
     if col != 'Applicant_Gender' and col in display_df.columns:
@@ -112,5 +112,6 @@ st.write("User input dataframe:", display_df)
 input_scaled = scaler.transform(input_df)
 prediction = model.predict(input_scaled)
 result = 'Approved' if prediction == 1 else 'Not Approved'
+
 st.subheader("Prediction")
 st.write(f"The customer is predicted as: **{result}**")
